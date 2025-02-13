@@ -8,7 +8,7 @@ import dotenv from "dotenv";
 import connectDB from "./config/db_config";
 import CustomError from "./utils/customError";
 import globalErrorHandler from "./middlewares/globalErrorHandler";
-
+import authRoutes from "./routes/auth.routes";
 dotenv.config();
 
 const app: Application = express();
@@ -30,6 +30,9 @@ const limiter = rateLimit({
   message: "Too many requests, please try again later.",
 });
 app.use(limiter);
+
+// Routes
+app.use("/api/v1/auth", authRoutes);
 
 // Basic Route
 app.get("/", (req: Request, res: Response) => {

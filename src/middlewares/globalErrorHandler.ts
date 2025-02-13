@@ -1,7 +1,7 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import CustomError from "../utils/customError";
 import mongoose from "mongoose";
-const globalErrorHandler = (err: CustomError, req: Request, res: Response) => {
+const globalErrorHandler = (err: CustomError, req: Request, res: Response, next: NextFunction) => {
   let { statusCode = 500, message } = err;
   const env = process.env.NODE_ENV;
 
@@ -9,6 +9,7 @@ const globalErrorHandler = (err: CustomError, req: Request, res: Response) => {
   if (err instanceof SyntaxError && "body" in err) {
     message = "Invalid JSON payload.";
     statusCode = 400;
+    next(new CustomError(message, statusCode));
   }
 
   // ✅ Fix: Handle Mongoose Validation Errors
@@ -18,6 +19,7 @@ const globalErrorHandler = (err: CustomError, req: Request, res: Response) => {
       .map((val: any) => val.message)
       .join(", ");
     statusCode = 400;
+    next(new CustomError(message, statusCode));
   }
 
   // Handle MongoDB Duplicate Key Errors (Error Code 11000)
@@ -26,16 +28,19 @@ const globalErrorHandler = (err: CustomError, req: Request, res: Response) => {
     const duplicatedField = (err as any).keyValue; // Type assertion
     message = `Duplicate field value entered: ${JSON.stringify(duplicatedField)}`;
     statusCode = 400;
+    next(new CustomError(message, statusCode));
   }
 
   // Handle JWT Authentication Errors
   if (err.name === "JsonWebTokenError") {
     message = "Invalid token. Please log in again.";
     statusCode = 401;
+    next(new CustomError(message, statusCode));
   }
   if (err.name === "TokenExpiredError") {
     message = "Token expired. Please log in again.";
     statusCode = 401;
+    next(new CustomError(message, statusCode));
   }
 
   // ✅ Fix: Format Response for Production & Development
