@@ -6,6 +6,8 @@ import morgan from "morgan";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import connectDB from "./config/db_config";
+import CustomError from "./utils/customError";
+import globalErrorHandler from "./middlewares/globalErrorHandler";
 
 dotenv.config();
 
@@ -31,17 +33,16 @@ app.use(limiter);
 
 // Basic Route
 app.get("/", (req: Request, res: Response) => {
-  res.send("API is running...");
+  res.send("API is running some changes...");
 });
 
-// Global Error Handling Middleware
-// eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(err.status || 500).json({
-    message: err.message || "Internal Server Error",
-  });
+// Handle undefined routes
+app.all("*", (req: Request, res: Response, next: NextFunction) => {
+  next(new CustomError(`Can't find ${req.originalUrl} on this server!`, 404));
 });
+
+// Global Error Middleware
+app.use(globalErrorHandler);
 
 // Start Server
 app.listen(PORT, () => {
