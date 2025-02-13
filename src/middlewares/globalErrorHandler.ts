@@ -24,9 +24,7 @@ const globalErrorHandler = (err: CustomError, req: Request, res: Response) => {
   if (err.code === 11000) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const duplicatedField = (err as any).keyValue; // Type assertion
-    message = `Duplicate field value entered: ${JSON.stringify(
-      duplicatedField
-    )}`;
+    message = `Duplicate field value entered: ${JSON.stringify(duplicatedField)}`;
     statusCode = 400;
   }
 
