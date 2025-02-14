@@ -1,11 +1,12 @@
 import { Document, Schema, model, CallbackError } from "mongoose";
 import bcrypt from "bcryptjs";
 
-interface IUser extends Document {
+export interface IUser extends Document {
   username: string;
   email: string;
   password: string;
   role?: string;
+  comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 const userSchema = new Schema<IUser>(
@@ -47,5 +48,11 @@ userSchema.pre<IUser>("save", async function (next) {
     next(error as CallbackError);
   }
 });
+
+// Compare the entered password with the hashed password in the database
+// ✅ Define comparePassword method
+userSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
+  return bcrypt.compare(candidatePassword, this.password);
+};
 
 export const userModel = model<IUser>("User", userSchema);
