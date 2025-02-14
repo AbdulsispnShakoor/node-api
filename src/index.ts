@@ -9,6 +9,7 @@ import connectDB from "./config/db_config";
 import CustomError from "./utils/customError";
 import globalErrorHandler from "./middlewares/globalErrorHandler";
 import authRoutes from "./routes/auth.routes";
+import cookieParser from "cookie-parser";
 dotenv.config();
 
 const app: Application = express();
@@ -20,6 +21,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
 app.use(helmet());
+app.use(cookieParser());
 app.use(compression());
 app.use(morgan("dev"));
 
