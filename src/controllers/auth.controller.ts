@@ -48,7 +48,7 @@ export const loginUser = asyncHandler(async (req: Request, res: Response, next: 
   const existUser = await userModel.findOne({ email }).select("+password");
   if (!existUser) {
     const errorMessage = "Invalid email or password";
-    const error = new CustomError(errorMessage, 401);
+    const error = new CustomError(errorMessage, 404);
     return next(error);
   }
 
