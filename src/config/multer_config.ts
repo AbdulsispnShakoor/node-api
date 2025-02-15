@@ -1,27 +1,29 @@
 import multer from "multer";
-import path from "path";
-import fs from "fs";
+import path from "node:path";
+import fs from "node:fs";
 
 const storage = multer.diskStorage({
-  destination: function (_, file, cb) {
-    const dirPath = path.join(__dirname, "..", "uploads");
+  destination: function (req, file, cb) {
+    const dirPath = path.join(__dirname, "../..", "uploads");
     if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath);
+      fs.mkdirSync(dirPath, { recursive: true });
     }
-    cb(null, "uploads/");
+    cb(null, dirPath);
   },
-  filename: function (_, file, cb) {
-    cb(null, Date.now() + "-" + file.originalname);
+  filename: function (req, file, cb) {
+    // ✅ Corrected: Include filename before extension
+    const uniqueName = `${Date.now()}-${file.originalname}`;
+    cb(null, uniqueName);
   },
 });
 
 // ✅ Define File Filter (Optional - Allows only specific file types)
 const fileFilter = (req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg", "application/pdf"];
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Only images and PDFs are allowed!"));
+    cb(new Error("Only images are allowed!"));
   }
 };
 

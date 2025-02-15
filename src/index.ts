@@ -9,6 +9,7 @@ import connectDB from "./config/db_config";
 import CustomError from "./utils/customError";
 import globalErrorHandler from "./middlewares/globalErrorHandler";
 import authRoutes from "./routes/auth.routes";
+import productRoutes from "./routes/product.routes";
 import cookieParser from "cookie-parser";
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use(limiter);
 
 // Routes
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/product", productRoutes);
 
 // Basic Route
 app.get("/", (req: Request, res: Response) => {
