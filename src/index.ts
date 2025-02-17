@@ -25,7 +25,7 @@ app.use(helmet());
 app.use(cookieParser());
 app.use(compression());
 app.use(morgan("dev"));
-
+app.use("/uploads", express.static("uploads")); // Serve uploaded files
 // Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
