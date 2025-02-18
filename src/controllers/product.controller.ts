@@ -146,7 +146,7 @@ export const getProducts = asyncHandler(async (req: Request, res: Response, next
     return next(error);
   }
 
-  res.status(200).json({
+  return res.status(200).json({
     success: true,
     count: products.length,
     page: pageNumber,
@@ -154,4 +154,69 @@ export const getProducts = asyncHandler(async (req: Request, res: Response, next
     totalProducts,
     products,
   });
+});
+
+// update product
+// 🆕 Update Product Controller
+export const updateProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  const { name, description, price, stock, category } = req.body;
+
+  try {
+    // Check if the product exists
+    let product = await ProductModel.findById(id);
+    if (!product) {
+      return next(new CustomError("Product not found", 404));
+    }
+
+    // Handle file uploads (if new images are uploaded)
+    let uploadedImages = product.images; // Keep old images if no new files
+
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      const files = req.files as Express.Multer.File[];
+
+      // Validate file types
+      const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+      const invalidFiles = files.filter((file) => !allowedMimeTypes.includes(file.mimetype));
+
+      if (invalidFiles.length > 0) {
+        return next(new CustomError("Only JPEG, PNG, and WEBP formats are allowed.", 400));
+      }
+
+      // Upload new images to Cloudinary
+      uploadedImages = await Promise.all(
+        files.map(async (file) => {
+          const result = await cloudinary.uploader.upload(file.path, {
+            folder: "products-images",
+            use_filename: true,
+            format: file.mimetype.split("/")[1],
+          });
+
+          // Delete temp file after upload
+          fs.unlink(file.path, (err) => {
+            if (err) {
+              console.error(`Failed to delete temp file ${file.path}:`, err);
+            }
+          });
+
+          return result.secure_url;
+        })
+      );
+    }
+
+    // Update product in the database
+    product = await ProductModel.findByIdAndUpdate(
+      id,
+      { name, description, price, stock, category, images: uploadedImages },
+      { new: true, runValidators: true }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Product updated successfully",
+      product,
+    });
+  } catch (error) {
+    return next(new CustomError(`Error updating product: ${error}`, 500));
+  }
 });
