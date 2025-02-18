@@ -224,96 +224,33 @@ export const getProducts = asyncHandler(async (req: Request, res: Response, next
 // 🆕 Update Product Controller with Image Deletion from Cloudinary
 export const updateProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
-  const { name, description, price, stock, category } = req.body;
 
-  try {
-    // Check if the product exists
-    let product = await ProductModel.findById(id);
-    if (!product) {
-      return next(new CustomError("Product not found", 404));
-    }
+  // Check if the product exists
+  const product = await ProductModel.findById(id);
 
-    let uploadedImages = product.images; // Default to existing images
-
-    // If new images are uploaded, delete old images from Cloudinary
-    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
-      const files = req.files as Express.Multer.File[];
-
-      // Validate file types
-      const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
-      const invalidFiles = files.filter((file) => !allowedMimeTypes.includes(file.mimetype));
-
-      if (invalidFiles.length > 0) {
-        return next(new CustomError("Only JPEG, PNG, and WEBP formats are allowed.", 400));
-      }
-
-      // 🗑 Delete old images from Cloudinary
-      if (product.images && product.images.length > 0) {
-        await Promise.all(
-          product.images.map(async (imageUrl: string) => {
-            const publicId = imageUrl.split("/").pop()?.split(".")[0]; // Extract public_id
-            if (publicId) {
-              await cloudinary.uploader.destroy(`products-images/${publicId}`);
-            }
-          })
-        );
-      }
-
-      // Upload new images to Cloudinary
-      uploadedImages = await Promise.all(
-        files.map(async (file) => {
-          const result = await cloudinary.uploader.upload(file.path, {
-            folder: "products-images",
-            use_filename: true,
-            format: file.mimetype.split("/")[1],
-          });
-
-          // Delete temp file after upload
-          fs.unlink(file.path, (err) => {
-            if (err) {
-              console.error(`Failed to delete temp file ${file.path}:`, err);
-            }
-          });
-
-          return result.secure_url;
-        })
-      );
-    }
-
-    // Update product in the database
-    product = await ProductModel.findByIdAndUpdate(
-      id,
-      { name, description, price, stock, category, images: uploadedImages },
-      { new: true, runValidators: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Product updated successfully",
-      product,
-    });
-  } catch (error) {
-    return next(new CustomError(`Error updating product: ${error}`, 500));
+  if (!product) {
+    return next(new CustomError("Product not found", 404));
   }
-});
 
-// 🗑 Delete Product Controller with Cloudinary Image Cleanup
-export const deleteProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  const { id } = req.params;
+  let uploadedImages = product.images; // Default to existing images
 
-  try {
-    // Check if the product exists
-    const product = await ProductModel.findById({ _id: id });
-    if (!product) {
-      return next(new CustomError("Product not found", 404));
+  // If new images are uploaded, delete old images from Cloudinary
+  if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+    const files = req.files as Express.Multer.File[];
+
+    // Validate file types
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+    const invalidFiles = files.filter((file) => !allowedMimeTypes.includes(file.mimetype));
+
+    if (invalidFiles.length > 0) {
+      return next(new CustomError("Only JPEG, PNG, and WEBP formats are allowed.", 400));
     }
 
-    // 🗑 Delete images from Cloudinary
+    // 🗑 Delete old images from Cloudinary
     if (product.images && product.images.length > 0) {
       await Promise.all(
         product.images.map(async (imageUrl: string) => {
           const publicId = imageUrl.split("/").pop()?.split(".")[0]; // Extract public_id
-          // console.log(publicId);
           if (publicId) {
             await cloudinary.uploader.destroy(`products-images/${publicId}`);
           }
@@ -321,14 +258,76 @@ export const deleteProduct = asyncHandler(async (req: Request, res: Response, ne
       );
     }
 
-    // Remove product from the database
-    await ProductModel.findByIdAndDelete(id);
+    // Upload new images to Cloudinary
+    uploadedImages = await Promise.all(
+      files.map(async (file) => {
+        const result = await cloudinary.uploader.upload(file.path, {
+          folder: "products-images",
+          use_filename: true,
+          format: file.mimetype.split("/")[1],
+        });
 
-    res.status(200).json({
-      success: true,
-      message: "Product deleted successfully",
-    });
-  } catch (error) {
-    return next(new CustomError(`Error deleting product: ${error}`, 500));
+        // Delete temp file after upload
+        fs.unlink(file.path, (err) => {
+          if (err) {
+            console.error(`Failed to delete temp file ${file.path}:`, err);
+          }
+        });
+
+        return result.secure_url;
+      })
+    );
   }
+  console.log(req.body);
+  // Update product in the database
+  const updatedProduct = await ProductModel.findByIdAndUpdate(
+    id,
+    { ...req.body, images: uploadedImages },
+    { new: true, runValidators: true }
+  );
+
+  // console.log(updateProduct);
+  res.status(200).json({
+    success: true,
+    message: "Product updated successfully",
+    updatedProduct,
+  });
 });
+
+// 🗑 Delete Product Controller with Cloudinary Image Cleanup
+export const deleteProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  // Check if the product exists
+  const product = await ProductModel.findById(id);
+  if (!product) {
+    return next(new CustomError("Product not found", 404));
+  }
+
+  // 🗑 Delete images from Cloudinary
+  if (product.images && product.images.length > 0) {
+    await Promise.all(
+      product.images.map(async (imageUrl: string) => {
+        const publicId = imageUrl.split("/").pop()?.split(".")[0]; // Extract public_id
+        if (publicId) {
+          await cloudinary.uploader.destroy(`products-images/${publicId}`);
+        }
+      })
+    );
+  }
+
+  // Remove product from the database
+  await ProductModel.findByIdAndDelete(id);
+
+  return res.status(200).json({
+    success: true,
+    message: "Product deleted successfully",
+  });
+});
+
+//  "images": [
+//   "https://res.cloudinary.com/drwpkkyaw/image/upload/v1739834337/products-images/1739834336185-615awbrwapL._AC_SL1500__n4yllj.jpg",
+//   "https://res.cloudinary.com/drwpkkyaw/image/upload/v1739834337/products-images/1739834336186-71RgjpWJlsL._AC_SL1500__rxonbt.jpg",
+//   "https://res.cloudinary.com/drwpkkyaw/image/upload/v1739834337/products-images/1739834336188-71u4rYkU2OL._AC_SL1500__doclfs.jpg",
+//   "https://res.cloudinary.com/drwpkkyaw/image/upload/v1739834337/products-images/1739834336195-71EzuuOCi7L._AC_SL1500__pxq3d6.jpg",
+//   "https://res.cloudinary.com/drwpkkyaw/image/upload/v1739834337/products-images/1739834336196-61xhRLouFTL._AC_SL1500__r5qwnb.jpg"
+// ],
