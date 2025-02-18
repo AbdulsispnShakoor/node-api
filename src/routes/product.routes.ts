@@ -1,10 +1,11 @@
 import express from "express";
 import { createProduct, getProducts } from "../controllers/product.controller";
 import upload from "../config/multer_config";
+import { protect } from "../middlewares/auth.middleware";
 const router = express.Router();
 // @access public
 // @register route
-router.post("/create-product", upload.array("images", 5), createProduct);
-router.post("/all-product", getProducts);
+router.post("/create-product", protect, upload.array("images", 5), createProduct);
+router.get("/all-products", protect, getProducts);
 
 export default router;

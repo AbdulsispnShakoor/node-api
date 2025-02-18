@@ -7,57 +7,6 @@ import fs from "fs";
 
 // import path from "node:path";
 
-// create product 01
-// export const createProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-//   // Ensure files exist and are an array
-//   if (!req.files || !Array.isArray(req.files) || req.files.length === 0) {
-//     return next(new CustomError("Please upload up to 5 image files for the product.", 400));
-//   }
-//   // Implement product creation logic here
-//   const files = req.files as Express.Multer.File[];
-
-//   // example  image mime types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
-
-//   const imagesMimeTypes = files?.map((file: Express.Multer.File) => file?.mimetype.split("/")[1]) || [];
-
-//   if (imagesMimeTypes.length > 5) {
-//     const errorMsg = "Maximum allowed files are 5";
-//     const error = new CustomError(errorMsg, 400);
-//     return next(error);
-//   }
-//   //   console.log(imagesMimeTypes);
-//   const fileNames = files?.map((file: Express.Multer.File) => file?.filename) || [];
-//   //   console.log(fileName);
-//   const filePath = path.join(__dirname, "../..", "uploads", fileNames);
-//   // console.log("filePath  :", filePath);
-
-//   const cloudinaryResult = await cloudinary_config.uploader.upload(filePath, {
-//     filename_Override: "",
-//     folder: "products-images",
-//     format: imagesMimeTypes,
-//   });
-//   // const productImages = [];
-
-//   const { name, description, price, stock, category } = req.body;
-//   // Validate product inputs
-//   if (!name || !description || !price || !stock || !category) {
-//     const errorMsg = "Please provide all required fields";
-//     const error = new CustomError(errorMsg, 400);
-//     return next(error);
-//   }
-//   //   const productData = req.body;
-//   //   console.log(productData);
-//   //   const product = await ProductModel.create(productData);
-//   //   // Handle product creation success
-//   //   if (product) {
-//   //     res.status(201).json({ success: true, message: "product created successfully", product });
-//   //   } else {
-//   //     const errorMsg = "Product creation failed";
-//   //     const error = new CustomError(errorMsg, 500);
-//   //     return next(error);
-//   //   }
-// });
-
 // create product 02
 export const createProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   // Ensure files exist and are an array
@@ -134,12 +83,75 @@ export const createProduct = asyncHandler(async (req: Request, res: Response, ne
 // get all products
 export const getProducts = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   // Implement product retrieval logic here
-  const products = await ProductModel.find();
+
+  // Extract query parameters
+  const { search, category, minPrice, maxPrice, sort, page = 1, limit = 10 } = req.query;
+
+  // Pagination settings
+  const pageNumber = Number(page) || 1;
+  const pageSize = Number(limit) || 10;
+  const skip = (pageNumber - 1) * pageSize;
+
+  // Build query object
+  let query: any = {};
+
+  // 🔍 Search by name, description, or category
+  if (search) {
+    query.$or = [
+      { name: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+      { category: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  // 🏷️ Filter by category
+  if (category) {
+    query.category = category;
+  }
+
+  // 💲 Filter by price range
+  if (minPrice || maxPrice) {
+    query.price = {};
+    if (minPrice) query.price.$gte = Number(minPrice);
+    if (maxPrice) query.price.$lte = Number(maxPrice);
+  }
+
+  // 🏷️ Sorting logic
+  let sortQuery: any = {};
+  if (sort) {
+    const sortFields = sort
+      .toString()
+      .split(",")
+      .map((field) => {
+        if (field.startsWith("-")) return [field.substring(1), -1]; // Descending
+        return [field, 1]; // Ascending
+      });
+
+    sortFields.forEach(([field, order]) => {
+      sortQuery[field] = order;
+    });
+  } else {
+    sortQuery.createdAt = -1; // Default sorting (Newest first)
+  }
+
+  // Fetch filtered, sorted, paginated products
+  const products = await ProductModel.find(query).sort(sortQuery).skip(skip).limit(pageSize);
+  // Get total count for pagination
+  const totalProducts = await ProductModel.countDocuments(query);
+  const totalPages = Math.ceil(totalProducts / pageSize);
+
   if (!products) {
     const errorMsg = "No products found";
     const error = new CustomError(errorMsg, 404);
     return next(error);
   }
-  res.status(200).json(products);
-  // Pagination and filtering options can be added here
+
+  res.status(200).json({
+    success: true,
+    count: products.length,
+    page: pageNumber,
+    totalPages,
+    totalProducts,
+    products,
+  });
 });

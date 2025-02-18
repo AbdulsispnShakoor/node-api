@@ -12,9 +12,7 @@ export const protect = (req: Request, res: Response, next: NextFunction) => {
       (req as any).user = decoded;
       next();
     } catch (error) {
-      res
-        .status(401)
-        .json({ message: "Not authorized, invalid token" + error });
+      res.status(401).json({ message: "Not authorized, invalid token" + error });
     }
   } else {
     res.status(401).json({ message: "Not authorized, no token" });
