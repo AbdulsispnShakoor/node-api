@@ -158,6 +158,70 @@ export const getProducts = asyncHandler(async (req: Request, res: Response, next
 
 // update product
 // 🆕 Update Product Controller
+// export const updateProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+//   const { id } = req.params;
+//   const { name, description, price, stock, category } = req.body;
+
+//   try {
+//     // Check if the product exists
+//     let product = await ProductModel.findById(id);
+//     if (!product) {
+//       return next(new CustomError("Product not found", 404));
+//     }
+
+//     // Handle file uploads (if new images are uploaded)
+//     let uploadedImages = product.images; // Keep old images if no new files
+
+//     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+//       const files = req.files as Express.Multer.File[];
+
+//       // Validate file types
+//       const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
+//       const invalidFiles = files.filter((file) => !allowedMimeTypes.includes(file.mimetype));
+
+//       if (invalidFiles.length > 0) {
+//         return next(new CustomError("Only JPEG, PNG, and WEBP formats are allowed.", 400));
+//       }
+
+//       // Upload new images to Cloudinary
+//       uploadedImages = await Promise.all(
+//         files.map(async (file) => {
+//           const result = await cloudinary.uploader.upload(file.path, {
+//             folder: "products-images",
+//             use_filename: true,
+//             format: file.mimetype.split("/")[1],
+//           });
+
+//           // Delete temp file after upload
+//           fs.unlink(file.path, (err) => {
+//             if (err) {
+//               console.error(`Failed to delete temp file ${file.path}:`, err);
+//             }
+//           });
+
+//           return result.secure_url;
+//         })
+//       );
+//     }
+
+//     // Update product in the database
+//     product = await ProductModel.findByIdAndUpdate(
+//       id,
+//       { name, description, price, stock, category, images: uploadedImages },
+//       { new: true, runValidators: true }
+//     );
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Product updated successfully",
+//       product,
+//     });
+//   } catch (error) {
+//     return next(new CustomError(`Error updating product: ${error}`, 500));
+//   }
+// });
+
+// 🆕 Update Product Controller with Image Deletion from Cloudinary
 export const updateProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const { id } = req.params;
   const { name, description, price, stock, category } = req.body;
@@ -169,9 +233,9 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response, ne
       return next(new CustomError("Product not found", 404));
     }
 
-    // Handle file uploads (if new images are uploaded)
-    let uploadedImages = product.images; // Keep old images if no new files
+    let uploadedImages = product.images; // Default to existing images
 
+    // If new images are uploaded, delete old images from Cloudinary
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       const files = req.files as Express.Multer.File[];
 
@@ -181,6 +245,18 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response, ne
 
       if (invalidFiles.length > 0) {
         return next(new CustomError("Only JPEG, PNG, and WEBP formats are allowed.", 400));
+      }
+
+      // 🗑 Delete old images from Cloudinary
+      if (product.images && product.images.length > 0) {
+        await Promise.all(
+          product.images.map(async (imageUrl: string) => {
+            const publicId = imageUrl.split("/").pop()?.split(".")[0]; // Extract public_id
+            if (publicId) {
+              await cloudinary.uploader.destroy(`products-images/${publicId}`);
+            }
+          })
+        );
       }
 
       // Upload new images to Cloudinary
@@ -211,12 +287,48 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response, ne
       { new: true, runValidators: true }
     );
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: "Product updated successfully",
       product,
     });
   } catch (error) {
     return next(new CustomError(`Error updating product: ${error}`, 500));
+  }
+});
+
+// 🗑 Delete Product Controller with Cloudinary Image Cleanup
+export const deleteProduct = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+
+  try {
+    // Check if the product exists
+    const product = await ProductModel.findById({ _id: id });
+    if (!product) {
+      return next(new CustomError("Product not found", 404));
+    }
+
+    // 🗑 Delete images from Cloudinary
+    if (product.images && product.images.length > 0) {
+      await Promise.all(
+        product.images.map(async (imageUrl: string) => {
+          const publicId = imageUrl.split("/").pop()?.split(".")[0]; // Extract public_id
+          // console.log(publicId);
+          if (publicId) {
+            await cloudinary.uploader.destroy(`products-images/${publicId}`);
+          }
+        })
+      );
+    }
+
+    // Remove product from the database
+    await ProductModel.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: "Product deleted successfully",
+    });
+  } catch (error) {
+    return next(new CustomError(`Error deleting product: ${error}`, 500));
   }
 });
